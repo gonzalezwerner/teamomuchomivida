@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sopa de Letras Te Amo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="background-veil" aria-hidden="true">
+    <span class="mist mist-a"></span>
+    <span class="mist mist-b"></span>
+    <span class="mist mist-c"></span>
+    <span class="spark spark-a"></span>
+    <span class="spark spark-b"></span>
+    <span class="spark spark-c"></span>
+    <span class="celestial-ring ring-a"></span>
+    <span class="celestial-ring ring-b"></span>
+    <span class="veil-heart veil-heart-a"></span>
+    <span class="veil-heart veil-heart-b"></span>
+    <span class="light-beam beam-a"></span>
+    <span class="light-beam beam-b"></span>
+  </div>
+
+  <main class="experience">
+    <section class="hero-card">
+      <div class="hero-copy-column">
+        <p class="eyebrow">Sopa de letras para enamorar</p>
+        <h1>Un tablero hecho para decir <span>te amo</span> de una forma inolvidable</h1>
+        <p class="hero-copy">
+          Encuentra cada palabra romantica. Cuando descubras la ultima, aparecera una celebracion
+          envolvente en 3D con un corazon flotando para cerrar el momento.
+        </p>
+
+        <div class="vow-banner">
+          <span>Promesa luminosa</span>
+          <strong>Cada palabra es una constelacion dedicada a la persona que amas.</strong>
+        </div>
+
+        <div class="hero-actions">
+          <button id="replayButton" class="ghost-button" type="button" disabled>Repetir animacion final</button>
+        </div>
+
+        <div class="hero-promise-grid">
+          <article class="promise-chip">
+            <span>01</span>
+            <strong>Brillo eterno</strong>
+            <p>Luces, halos y profundidad para sentir un momento casi magico.</p>
+          </article>
+          <article class="promise-chip">
+            <span>02</span>
+            <strong>Ritual romantico</strong>
+            <p>El tablero se convierte en un altar visual donde cada hallazgo enamora.</p>
+          </article>
+          <article class="promise-chip">
+            <span>03</span>
+            <strong>Final inolvidable</strong>
+            <p>Una escena tridimensional intensa, teatral y profundamente sentimental.</p>
+          </article>
+        </div>
+      </div>
+
+      <div class="hero-visual" aria-hidden="true">
+        <div class="hero-visual-aura"></div>
+        <div class="hero-arch hero-arch-a"></div>
+        <div class="hero-arch hero-arch-b"></div>
+        <div class="hero-arch hero-arch-c"></div>
+        <div class="hero-heart-prism">
+          <span class="prism-layer prism-layer-a"></span>
+          <span class="prism-layer prism-layer-b"></span>
+          <span class="prism-layer prism-layer-c"></span>
+          <span class="prism-core"></span>
+        </div>
+        <div class="hero-ribbon-orbit hero-ribbon-orbit-a">
+          <span>Mi alma</span>
+          <span>Mi refugio</span>
+          <span>Mi latido</span>
+          <span>Mi poesia</span>
+        </div>
+        <div class="hero-ribbon-orbit hero-ribbon-orbit-b">
+          <span>Para siempre</span>
+          <span>Tu y yo</span>
+          <span>Mi destino</span>
+          <span>Mi cielo</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="game-layout">
+      <div class="board-panel">
+        <div class="panel-topline">
+          <p>Arrastra en linea recta para marcar palabras</p>
+          <div class="progress-pill"><span id="progressText">0 / 0 encontradas</span></div>
+        </div>
+
+        <div class="board-stage">
+          <div class="board-aurora" aria-hidden="true"></div>
+          <div class="board-pedestal" aria-hidden="true"></div>
+
+          <div class="board-frame">
+            <div class="board-canopy" aria-hidden="true">
+              <span class="canopy-ring canopy-ring-a"></span>
+              <span class="canopy-ring canopy-ring-b"></span>
+              <span class="canopy-ring canopy-ring-c"></span>
+            </div>
+            <div class="board-lights" aria-hidden="true">
+              <span class="board-light board-light-a"></span>
+              <span class="board-light board-light-b"></span>
+              <span class="board-light board-light-c"></span>
+            </div>
+            <div id="board" class="board" aria-label="Sopa de letras romantica"></div>
+            <div id="selectionHint" class="selection-hint">Busca cada palabra del listado para revelar la sorpresa.</div>
+            <p class="board-mantra">Tu amor convierte cada letra en una pequena constelacion.</p>
+          </div>
+        </div>
+      </div>
+
+      <aside class="sidebar-panel">
+        <div class="sidebar-card score-card">
+          <p class="card-label">Progreso</p>
+          <div class="score-ring">
+            <span id="scorePercent">0%</span>
+          </div>
+          <p id="statusMessage" class="status-message">La historia apenas comienza.</p>
+        </div>
+
+        <div class="sidebar-card words-card">
+          <p class="card-label">Palabras del corazon</p>
+          <ul id="wordList" class="word-list"></ul>
+        </div>
+
+        <div class="sidebar-card dedication-card">
+          <p class="card-label">Mensaje secreto</p>
+          <p class="dedication-quote">"Si existiera un cielo hecho de caricias, seguramente se veria asi."</p>
+          <p>
+            Cada palabra encontrada ilumina un poco mas el cielo. Al terminar, el tablero abre una
+            escena romantica completa en 3D.
+          </p>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <div id="completionOverlay" class="completion-overlay" aria-hidden="true">
+    <canvas id="celebrationCanvas"></canvas>
+    <div class="overlay-gradient" aria-hidden="true"></div>
+
+    <div class="celebration-scene">
+      <div class="scene-aura" aria-hidden="true"></div>
+      <div class="scene-floor" aria-hidden="true"></div>
+      <div class="cathedral-lights" aria-hidden="true">
+        <span class="light-column light-column-a"></span>
+        <span class="light-column light-column-b"></span>
+        <span class="light-column light-column-c"></span>
+        <span class="arch-lens arch-lens-a"></span>
+        <span class="arch-lens arch-lens-b"></span>
+      </div>
+
+      <div class="floating-orbit orbit-a" aria-hidden="true">
+        <span>Te amo</span>
+        <span>Para siempre</span>
+        <span>Mi cielo</span>
+        <span>Contigo</span>
+      </div>
+      <div class="floating-orbit orbit-b" aria-hidden="true">
+        <span>Mi amor</span>
+        <span>Eres magia</span>
+        <span>Mi destino</span>
+        <span>Mi universo</span>
+      </div>
+      <div class="floating-orbit orbit-c" aria-hidden="true">
+        <span>Mi paz</span>
+        <span>Mi luz</span>
+        <span>Mi estrella</span>
+        <span>Mi hogar</span>
+      </div>
+
+      <div class="heart-sanctuary" aria-hidden="true">
+        <div class="halo-stack">
+          <span class="halo-ring halo-ring-a"></span>
+          <span class="halo-ring halo-ring-b"></span>
+          <span class="halo-ring halo-ring-c"></span>
+        </div>
+        <div class="petal-crown">
+          <span class="petal-echo petal-echo-a"></span>
+          <span class="petal-echo petal-echo-b"></span>
+          <span class="petal-echo petal-echo-c"></span>
+          <span class="petal-echo petal-echo-d"></span>
+          <span class="petal-echo petal-echo-e"></span>
+          <span class="petal-echo petal-echo-f"></span>
+        </div>
+        <div class="heart-core"></div>
+        <div class="heart-shell">
+          <span class="facet facet-1"></span>
+          <span class="facet facet-2"></span>
+          <span class="facet facet-3"></span>
+          <span class="facet facet-4"></span>
+          <span class="facet facet-5"></span>
+          <span class="facet facet-6"></span>
+          <span class="facet facet-7"></span>
+          <span class="facet facet-8"></span>
+          <span class="facet facet-9"></span>
+          <span class="facet facet-10"></span>
+          <span class="facet facet-11"></span>
+          <span class="facet facet-12"></span>
+        </div>
+      </div>
+
+      <div class="message-monument">
+        <p class="celebration-prefix">La sorpresa aparecio</p>
+        <h2>Te amo con todo mi universo</h2>
+        <p class="celebration-subtitle">Mi lugar favorito en la vida siempre sera contigo.</p>
+        <p class="celebration-copy">
+          Cada brillo, cada corazon y cada giro de esta escena existe para convertir el final de la
+          sopa de letras en un momento profundamente romantico.
+        </p>
+        <div class="overlay-actions">
+          <button id="playAgainButton" class="primary-button" type="button">Volver a jugar</button>
+          <button id="closeOverlayButton" class="ghost-button" type="button">Seguir viendo el tablero</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
