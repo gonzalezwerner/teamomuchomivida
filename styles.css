@@ -955,6 +955,99 @@ button {
   color: rgba(255, 232, 193, 0.94);
 }
 
+body.performance-lite .background-veil {
+  transform: none;
+}
+
+body.performance-lite .mist,
+body.performance-lite .spark,
+body.performance-lite .celestial-ring,
+body.performance-lite .veil-heart,
+body.performance-lite .light-beam,
+body.performance-lite .hero-ribbon-orbit,
+body.performance-lite .board-canopy,
+body.performance-lite .board-lights,
+body.performance-lite .board-aurora,
+body.performance-lite .board-pedestal,
+body.performance-lite .orbit-b,
+body.performance-lite .orbit-c,
+body.performance-lite .halo-stack,
+body.performance-lite .petal-crown,
+body.performance-lite .cathedral-lights {
+  display: none;
+}
+
+body.performance-lite .hero-card,
+body.performance-lite .board-panel,
+body.performance-lite .sidebar-card,
+body.performance-lite .message-monument,
+body.performance-lite .floating-orbit span {
+  backdrop-filter: none;
+}
+
+body.performance-lite .hero-card,
+body.performance-lite .board-panel,
+body.performance-lite .sidebar-card {
+  transform: none;
+  box-shadow:
+    0 18px 42px rgba(7, 0, 5, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+body.performance-lite .hero-visual,
+body.performance-lite .board-frame,
+body.performance-lite .sidebar-card {
+  transform: none;
+}
+
+body.performance-lite .hero-visual {
+  min-height: 11rem;
+}
+
+body.performance-lite .hero-visual-aura,
+body.performance-lite .hero-arch-b,
+body.performance-lite .hero-arch-c {
+  display: none;
+}
+
+body.performance-lite .hero-heart-prism,
+body.performance-lite .heart-sanctuary,
+body.performance-lite .heart-shell {
+  animation-duration: 28s;
+}
+
+body.performance-lite .scene-aura,
+body.performance-lite .scene-floor {
+  filter: none;
+  animation-duration: 14s;
+}
+
+body.performance-lite .cell,
+body.performance-lite .word-item,
+body.performance-lite .cell.is-found {
+  animation: none;
+}
+
+body.performance-lite .cell:hover,
+body.performance-lite .promise-chip:hover,
+body.performance-lite .sidebar-card:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+body.performance-lite .cell,
+body.performance-lite .word-item,
+body.performance-lite .promise-chip,
+body.performance-lite .primary-button,
+body.performance-lite .ghost-button {
+  box-shadow: none;
+}
+
+body.performance-lite .primary-button:hover,
+body.performance-lite .ghost-button:hover {
+  transform: none;
+}
+
 .completion-overlay {
   position: fixed;
   inset: 0;
