@@ -55,6 +55,11 @@ const state = {
   foundWords: new Set(),
   foundCells: new Set(),
   cellMap: new Map(),
+  boardMetrics: null,
+  selectionLayer: null,
+  selectionRibbon: null,
+  selectionStartOrb: null,
+  selectionEndOrb: null,
   dragging: false,
   startCell: null,
   previewCells: [],
@@ -82,6 +87,8 @@ const celebration = {
 };
 
 let overlayTimeoutId = 0;
+let selectionRibbonTimeoutId = 0;
+let previewClearTimeoutId = 0;
 let parallaxRafId = 0;
 let pendingParallaxPoint = null;
 let tiltRafId = 0;
@@ -219,6 +226,20 @@ function buildBoard() {
   boardElement.style.setProperty("--board-size", GRID_SIZE);
   state.cellMap.clear();
 
+  const selectionLayer = document.createElement("div");
+  selectionLayer.className = "selection-layer";
+  selectionLayer.setAttribute("aria-hidden", "true");
+  selectionLayer.innerHTML = `
+    <div class="selection-ribbon"></div>
+    <span class="selection-orb selection-orb-start"></span>
+    <span class="selection-orb selection-orb-end"></span>
+  `;
+  boardElement.appendChild(selectionLayer);
+  state.selectionLayer = selectionLayer;
+  state.selectionRibbon = selectionLayer.querySelector(".selection-ribbon");
+  state.selectionStartOrb = selectionLayer.querySelector(".selection-orb-start");
+  state.selectionEndOrb = selectionLayer.querySelector(".selection-orb-end");
+
   state.grid.forEach((row, rowIndex) => {
     row.forEach((letter, colIndex) => {
       const cell = document.createElement("button");
@@ -240,9 +261,38 @@ function buildBoard() {
       boardElement.appendChild(cell);
     });
   });
+
+  updateBoardMetrics();
 }
 
-function clearPreview() {
+function updateBoardMetrics() {
+  const firstCell = state.cellMap.get(coordsToKey(0, 0));
+  if (!firstCell) {
+    state.boardMetrics = null;
+    return;
+  }
+
+  const boardRect = boardElement.getBoundingClientRect();
+  const firstRect = firstCell.getBoundingClientRect();
+  const nextColCell = state.cellMap.get(coordsToKey(0, 1));
+  const nextRowCell = state.cellMap.get(coordsToKey(1, 0));
+  const nextColRect = nextColCell?.getBoundingClientRect();
+  const nextRowRect = nextRowCell?.getBoundingClientRect();
+
+  state.boardMetrics = {
+    boardRect,
+    cellWidth: firstRect.width,
+    cellHeight: firstRect.height,
+    stepX: nextColRect ? nextColRect.left - firstRect.left : firstRect.width,
+    stepY: nextRowRect ? nextRowRect.top - firstRect.top : firstRect.height,
+    firstCenterX:
+      firstRect.left - boardRect.left + firstRect.width / 2,
+    firstCenterY:
+      firstRect.top - boardRect.top + firstRect.height / 2,
+  };
+}
+
+function clearPreview(hideRibbon = true) {
   state.previewCells.forEach(({ row, col }) => {
     const cell = state.cellMap.get(coordsToKey(row, col));
     if (cell && !state.foundCells.has(coordsToKey(row, col))) {
@@ -251,10 +301,14 @@ function clearPreview() {
   });
 
   state.previewCells = [];
+  if (hideRibbon) {
+    updateSelectionRibbon([]);
+  }
 }
 
 function setPreview(cells) {
-  clearPreview();
+  window.clearTimeout(previewClearTimeoutId);
+  clearPreview(false);
   state.previewCells = cells;
 
   cells.forEach(({ row, col }) => {
@@ -263,6 +317,8 @@ function setPreview(cells) {
       cell.classList.add("is-preview");
     }
   });
+
+  updateSelectionRibbon(cells);
 }
 
 function getLineCells(start, end) {
@@ -290,7 +346,52 @@ function getLineCells(start, end) {
   return cells;
 }
 
+function snapCellToLine(start, candidate) {
+  if (!candidate) {
+    return null;
+  }
+
+  const deltaCol = candidate.col - start.col;
+  const deltaRow = candidate.row - start.row;
+
+  if (deltaCol === 0 && deltaRow === 0) {
+    return start;
+  }
+
+  let bestDirection = DIRECTIONS[0];
+  let bestProjection = -Infinity;
+
+  DIRECTIONS.forEach(([dx, dy]) => {
+    const magnitude = dx * dx + dy * dy;
+    const projection = (deltaCol * dx + deltaRow * dy) / magnitude;
+    if (projection > bestProjection) {
+      bestProjection = projection;
+      bestDirection = [dx, dy];
+    }
+  });
+
+  const [dirX, dirY] = bestDirection;
+  const directionMagnitude = dirX * dirX + dirY * dirY;
+  const projectedLength = Math.max(
+    0,
+    Math.round((deltaCol * dirX + deltaRow * dirY) / directionMagnitude)
+  );
+
+  let col = start.col + dirX * projectedLength;
+  let row = start.row + dirY * projectedLength;
+
+  col = Math.max(0, Math.min(GRID_SIZE - 1, col));
+  row = Math.max(0, Math.min(GRID_SIZE - 1, row));
+
+  return { row, col };
+}
+
 function eventToCell(event) {
+  const snappedCell = pointToNearestCell(event.clientX, event.clientY);
+  if (snappedCell) {
+    return snappedCell;
+  }
+
   const element = document.elementFromPoint(event.clientX, event.clientY);
   if (!element || !element.classList.contains("cell")) {
     return null;
@@ -300,6 +401,108 @@ function eventToCell(event) {
     row: Number(element.dataset.row),
     col: Number(element.dataset.col),
   };
+}
+
+function pointToNearestCell(clientX, clientY) {
+  if (!state.boardMetrics) {
+    updateBoardMetrics();
+  }
+
+  if (!state.boardMetrics) {
+    return null;
+  }
+
+  const {
+    boardRect,
+    cellWidth,
+    cellHeight,
+    stepX,
+    stepY,
+    firstCenterX,
+    firstCenterY,
+  } = state.boardMetrics;
+  const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+  const paddingX = coarsePointer ? Math.max(stepX * 0.8, 18) : stepX * 0.3;
+  const paddingY = coarsePointer ? Math.max(stepY * 0.9, 18) : stepY * 0.3;
+
+  if (
+    clientX < boardRect.left - paddingX ||
+    clientX > boardRect.right + paddingX ||
+    clientY < boardRect.top - paddingY ||
+    clientY > boardRect.bottom + paddingY
+  ) {
+    return null;
+  }
+
+  const localX = clientX - boardRect.left;
+  const localY = clientY - boardRect.top;
+  const col = Math.round((localX - firstCenterX) / stepX);
+  const row = Math.round((localY - firstCenterY) / stepY);
+
+  return {
+    row: Math.max(0, Math.min(GRID_SIZE - 1, row)),
+    col: Math.max(0, Math.min(GRID_SIZE - 1, col)),
+  };
+}
+
+function updateSelectionRibbon(cells) {
+  if (
+    !state.selectionLayer ||
+    !state.selectionRibbon ||
+    !state.selectionStartOrb ||
+    !state.selectionEndOrb
+  ) {
+    return;
+  }
+
+  if (!cells.length) {
+    state.selectionLayer.classList.remove("is-visible");
+    return;
+  }
+
+  const startCell = state.cellMap.get(coordsToKey(cells[0].row, cells[0].col));
+  const endCell = state.cellMap.get(
+    coordsToKey(cells[cells.length - 1].row, cells[cells.length - 1].col)
+  );
+
+  if (!startCell || !endCell) {
+    state.selectionLayer.classList.remove("is-visible");
+    return;
+  }
+
+  const boardRect = boardElement.getBoundingClientRect();
+  const startRect = startCell.getBoundingClientRect();
+  const endRect = endCell.getBoundingClientRect();
+  const startX = startRect.left - boardRect.left + startRect.width / 2;
+  const startY = startRect.top - boardRect.top + startRect.height / 2;
+  const endX = endRect.left - boardRect.left + endRect.width / 2;
+  const endY = endRect.top - boardRect.top + endRect.height / 2;
+  const distance = Math.hypot(endX - startX, endY - startY);
+  const angle = Math.atan2(endY - startY, endX - startX);
+
+  state.selectionLayer.classList.add("is-visible");
+  state.selectionRibbon.style.width = `${Math.max(distance, 1)}px`;
+  state.selectionRibbon.style.left = `${startX}px`;
+  state.selectionRibbon.style.top = `${startY}px`;
+  state.selectionRibbon.style.transform = `translateY(-50%) rotate(${angle}rad)`;
+  state.selectionStartOrb.style.left = `${startX}px`;
+  state.selectionStartOrb.style.top = `${startY}px`;
+  state.selectionEndOrb.style.left = `${endX}px`;
+  state.selectionEndOrb.style.top = `${endY}px`;
+}
+
+function pulseSelectionRibbon(kind) {
+  if (!state.selectionLayer) {
+    return;
+  }
+
+  window.clearTimeout(selectionRibbonTimeoutId);
+  state.selectionLayer.classList.remove("is-success", "is-invalid");
+  void state.selectionLayer.offsetWidth;
+  state.selectionLayer.classList.add(kind === "success" ? "is-success" : "is-invalid");
+  selectionRibbonTimeoutId = window.setTimeout(() => {
+    state.selectionLayer?.classList.remove("is-success", "is-invalid");
+  }, 520);
 }
 
 function updateProgress() {
@@ -328,6 +531,7 @@ function updateProgress() {
 
 function markWordFound(placement) {
   state.foundWords.add(placement.key);
+  pulseSelectionRibbon("success");
   placement.cells.forEach(({ row, col }) => {
     const key = coordsToKey(row, col);
     state.foundCells.add(key);
@@ -355,6 +559,7 @@ function markWordFound(placement) {
 }
 
 function flashInvalidSelection(cells) {
+  pulseSelectionRibbon("invalid");
   cells.forEach(({ row, col }) => {
     const cell = state.cellMap.get(coordsToKey(row, col));
     if (cell) {
@@ -397,23 +602,24 @@ function finalizeSelection() {
     flashInvalidSelection(state.previewCells);
   }
 
-  clearPreview();
+  previewClearTimeoutId = window.setTimeout(
+    clearPreview,
+    matched ? 180 : 220
+  );
 }
 
 function handlePointerDown(event) {
-  const target = event.target;
-  if (!target.classList.contains("cell")) {
+  const startCell = eventToCell(event);
+  if (!startCell) {
     return;
   }
 
+  event.preventDefault();
   state.dragging = true;
-  state.startCell = {
-    row: Number(target.dataset.row),
-    col: Number(target.dataset.col),
-  };
-
+  state.startCell = startCell;
+  boardElement.classList.add("is-dragging");
   setPreview([state.startCell]);
-  target.setPointerCapture?.(event.pointerId);
+  event.target.setPointerCapture?.(event.pointerId);
 }
 
 function handlePointerMove(event) {
@@ -421,12 +627,14 @@ function handlePointerMove(event) {
     return;
   }
 
+  event.preventDefault();
   const currentCell = eventToCell(event);
   if (!currentCell) {
     return;
   }
 
-  const cells = getLineCells(state.startCell, currentCell);
+  const snappedEnd = snapCellToLine(state.startCell, currentCell);
+  const cells = getLineCells(state.startCell, snappedEnd);
   if (cells.length) {
     setPreview(cells);
   }
@@ -438,6 +646,7 @@ function stopDragging() {
   }
 
   state.dragging = false;
+  boardElement.classList.remove("is-dragging");
   state.startCell = null;
   finalizeSelection();
 }
@@ -500,6 +709,7 @@ function scheduleGlobalParallax(clientX, clientY) {
 
 function resetGameState() {
   window.clearTimeout(overlayTimeoutId);
+  window.clearTimeout(previewClearTimeoutId);
   if (parallaxRafId) {
     window.cancelAnimationFrame(parallaxRafId);
     parallaxRafId = 0;
@@ -516,6 +726,7 @@ function resetGameState() {
   state.startCell = null;
   state.previewCells = [];
   state.completed = false;
+  boardElement.classList.remove("is-dragging");
   replayButton.disabled = true;
   completionOverlay.classList.remove("is-active");
   completionOverlay.setAttribute("aria-hidden", "true");
@@ -1119,7 +1330,7 @@ boardElement.addEventListener("pointerdown", handlePointerDown);
 boardElement.addEventListener("pointermove", handlePointerMove);
 boardElement.addEventListener("pointerup", stopDragging);
 boardElement.addEventListener("pointerleave", (event) => {
-  if (!state.dragging) {
+  if (!state.dragging || event.pointerType !== "mouse") {
     return;
   }
 
@@ -1136,6 +1347,7 @@ window.addEventListener("pointermove", (event) => {
 window.addEventListener("pointerleave", resetGlobalParallax);
 window.addEventListener("resize", () => {
   applyPerformanceMode();
+  updateBoardMetrics();
   if (celebration.running) {
     initCelebrationScene();
   }
