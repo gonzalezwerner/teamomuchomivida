@@ -760,8 +760,83 @@ button {
   justify-content: center;
   touch-action: none;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
   transform-style: preserve-3d;
   transform: translateZ(5rem);
+}
+
+.selection-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.selection-layer.is-visible {
+  opacity: 1;
+}
+
+.selection-ribbon {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: clamp(0.42rem, 1vw, 0.72rem);
+  border-radius: 999px;
+  transform-origin: left center;
+  background:
+    linear-gradient(90deg, rgba(255, 233, 176, 0.95), rgba(248, 124, 164, 0.96) 52%, rgba(255, 238, 220, 0.95));
+  box-shadow:
+    0 0 18px rgba(255, 214, 156, 0.45),
+    0 0 28px rgba(248, 124, 164, 0.28);
+}
+
+.selection-ribbon::before {
+  content: "";
+  position: absolute;
+  inset: -0.5rem 0;
+  border-radius: inherit;
+  background: inherit;
+  filter: blur(14px);
+  opacity: 0.55;
+}
+
+.selection-orb {
+  position: absolute;
+  width: clamp(1rem, 2vw, 1.25rem);
+  height: clamp(1rem, 2vw, 1.25rem);
+  margin-left: calc(clamp(1rem, 2vw, 1.25rem) / -2);
+  margin-top: calc(clamp(1rem, 2vw, 1.25rem) / -2);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0) 34%),
+    radial-gradient(circle, rgba(255, 231, 180, 0.96), rgba(248, 124, 164, 0.92));
+  box-shadow:
+    0 0 16px rgba(255, 219, 173, 0.48),
+    0 0 28px rgba(248, 124, 164, 0.3);
+}
+
+.selection-orb::after {
+  content: "";
+  position: absolute;
+  inset: -0.45rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 229, 196, 0.28);
+  opacity: 0.68;
+  animation: selectionHalo 1.8s ease-in-out infinite;
+}
+
+.selection-layer.is-success .selection-ribbon {
+  animation: selectionSuccess 520ms ease;
+}
+
+.selection-layer.is-invalid .selection-ribbon {
+  animation: selectionInvalid 420ms ease;
+}
+
+.selection-layer.is-success .selection-orb {
+  animation: selectionOrbPulse 520ms ease;
 }
 
 .cell {
@@ -779,6 +854,8 @@ button {
   font-size: clamp(0.9rem, 2vw, 1.05rem);
   font-weight: 700;
   text-transform: uppercase;
+  position: relative;
+  z-index: 1;
   transform-style: preserve-3d;
   transform: translateZ(0);
   animation: cellRise 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -805,6 +882,10 @@ button {
   border-color: rgba(255, 225, 208, 0.72);
   box-shadow: 0 0 24px rgba(255, 195, 154, 0.4);
   transform: translateY(-2px) translateZ(1rem) scale(1.04);
+}
+
+.board.is-dragging .cell {
+  transition-duration: 90ms;
 }
 
 .cell.is-found {
@@ -1537,6 +1618,59 @@ body.performance-lite .ghost-button:hover {
   }
 }
 
+@keyframes selectionHalo {
+  0%, 100% {
+    transform: scale(0.92);
+    opacity: 0.48;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.1;
+  }
+}
+
+@keyframes selectionSuccess {
+  0% {
+    filter: saturate(1);
+    transform: translateY(-50%) scaleX(0.96);
+  }
+  50% {
+    filter: saturate(1.2);
+    transform: translateY(-50%) scaleX(1.04);
+  }
+  100% {
+    filter: saturate(1);
+    transform: translateY(-50%) scaleX(1);
+  }
+}
+
+@keyframes selectionInvalid {
+  0%, 100% {
+    transform: translateY(-50%);
+  }
+  25% {
+    transform: translate(-4px, -50%);
+  }
+  50% {
+    transform: translate(4px, -50%);
+  }
+  75% {
+    transform: translate(-2px, -50%);
+  }
+}
+
+@keyframes selectionOrbPulse {
+  0% {
+    transform: scale(0.92);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 @keyframes cardSlideIn {
   from {
     opacity: 0;
@@ -1713,6 +1847,17 @@ body.performance-lite .ghost-button:hover {
     opacity: 0.52;
   }
 
+  .selection-ribbon {
+    height: 0.62rem;
+  }
+
+  .selection-orb {
+    width: 1.15rem;
+    height: 1.15rem;
+    margin-left: -0.575rem;
+    margin-top: -0.575rem;
+  }
+
   .sidebar-panel {
     grid-template-columns: 1fr;
   }
@@ -1886,6 +2031,10 @@ body.performance-lite .ghost-button:hover {
   .selection-hint {
     font-size: 0.84rem;
     line-height: 1.55;
+  }
+
+  .selection-ribbon {
+    height: 0.68rem;
   }
 
   .score-ring {
