@@ -358,24 +358,26 @@ function snapCellToLine(start, candidate) {
     return start;
   }
 
-  let bestDirection = DIRECTIONS[0];
-  let bestProjection = -Infinity;
+  const absCol = Math.abs(deltaCol);
+  const absRow = Math.abs(deltaRow);
+  const horizontalBias = absRow === 0 ? Infinity : absCol / absRow;
+  let dirX = 0;
+  let dirY = 0;
+  let projectedLength = 0;
 
-  DIRECTIONS.forEach(([dx, dy]) => {
-    const magnitude = dx * dx + dy * dy;
-    const projection = (deltaCol * dx + deltaRow * dy) / magnitude;
-    if (projection > bestProjection) {
-      bestProjection = projection;
-      bestDirection = [dx, dy];
-    }
-  });
-
-  const [dirX, dirY] = bestDirection;
-  const directionMagnitude = dirX * dirX + dirY * dirY;
-  const projectedLength = Math.max(
-    0,
-    Math.round((deltaCol * dirX + deltaRow * dirY) / directionMagnitude)
-  );
+  if (horizontalBias >= 1.6) {
+    dirX = Math.sign(deltaCol);
+    dirY = 0;
+    projectedLength = absCol;
+  } else if (horizontalBias <= 0.62) {
+    dirX = 0;
+    dirY = Math.sign(deltaRow);
+    projectedLength = absRow;
+  } else {
+    dirX = Math.sign(deltaCol);
+    dirY = Math.sign(deltaRow);
+    projectedLength = Math.max(1, Math.round((absCol + absRow) / 2));
+  }
 
   let col = start.col + dirX * projectedLength;
   let row = start.row + dirY * projectedLength;
