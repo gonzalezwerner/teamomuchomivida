@@ -35,6 +35,7 @@ const CELEBRATION_MESSAGES = [
 
 const rootStyle = document.documentElement.style;
 const experienceElement = document.querySelector(".experience");
+const bodyElement = document.body;
 const boardElement = document.querySelector("#board");
 const wordListElement = document.querySelector("#wordList");
 const progressTextElement = document.querySelector("#progressText");
@@ -77,9 +78,14 @@ const celebration = {
   focalLength: 620,
   quality: 1,
   isMobile: false,
+  simpleMode: false,
 };
 
 let overlayTimeoutId = 0;
+let parallaxRafId = 0;
+let pendingParallaxPoint = null;
+let tiltRafId = 0;
+let pendingTiltPoint = null;
 
 function shuffle(array) {
   for (let index = array.length - 1; index > 0; index -= 1) {
@@ -436,9 +442,27 @@ function stopDragging() {
   finalizeSelection();
 }
 
+function applyPerformanceMode() {
+  const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const lowMemory =
+    typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 4;
+  const narrowViewport = window.innerWidth < 820;
+
+  bodyElement.classList.toggle(
+    "performance-lite",
+    coarsePointer || reducedMotion || lowMemory || narrowViewport
+  );
+}
+
 function updateGlobalParallax(clientX, clientY) {
   const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
-  if (window.innerWidth < 900 || coarsePointer || !experienceElement) {
+  if (
+    window.innerWidth < 900 ||
+    coarsePointer ||
+    bodyElement.classList.contains("performance-lite") ||
+    !experienceElement
+  ) {
     resetGlobalParallax();
     return;
   }
@@ -454,8 +478,38 @@ function resetGlobalParallax() {
   rootStyle.setProperty("--parallax-y", "0px");
 }
 
+function scheduleGlobalParallax(clientX, clientY) {
+  pendingParallaxPoint = { clientX, clientY };
+  if (parallaxRafId) {
+    return;
+  }
+
+  parallaxRafId = window.requestAnimationFrame(() => {
+    parallaxRafId = 0;
+    if (!pendingParallaxPoint) {
+      return;
+    }
+
+    updateGlobalParallax(
+      pendingParallaxPoint.clientX,
+      pendingParallaxPoint.clientY
+    );
+    pendingParallaxPoint = null;
+  });
+}
+
 function resetGameState() {
   window.clearTimeout(overlayTimeoutId);
+  if (parallaxRafId) {
+    window.cancelAnimationFrame(parallaxRafId);
+    parallaxRafId = 0;
+  }
+  if (tiltRafId) {
+    window.cancelAnimationFrame(tiltRafId);
+    tiltRafId = 0;
+  }
+  pendingParallaxPoint = null;
+  pendingTiltPoint = null;
   state.foundWords.clear();
   state.foundCells.clear();
   state.dragging = false;
@@ -474,6 +528,7 @@ function resetGameState() {
 
 function setupGame() {
   resetGameState();
+  applyPerformanceMode();
   const puzzle = generatePuzzle();
   state.grid = puzzle.grid;
   state.placements = puzzle.placements;
@@ -486,10 +541,13 @@ function resizeCelebrationCanvas() {
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
   const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
-  const compactMobile = viewportWidth < 520;
+  const performanceLite = bodyElement.classList.contains("performance-lite");
+  const compactMobile = viewportWidth < 520 || (performanceLite && viewportWidth < 900);
   celebration.isMobile =
     coarsePointer || viewportWidth < 760 || viewportHeight > viewportWidth * 1.15;
-  celebration.quality = compactMobile ? 0.5 : celebration.isMobile ? 0.64 : 1;
+  celebration.simpleMode = compactMobile || performanceLite;
+  celebration.quality =
+    compactMobile ? 0.26 : celebration.simpleMode ? 0.4 : celebration.isMobile ? 0.58 : 1;
   celebration.centerX = viewportWidth / 2;
   celebration.centerY =
     viewportHeight * (compactMobile ? 0.31 : celebration.isMobile ? 0.34 : 0.42);
@@ -499,7 +557,7 @@ function resizeCelebrationCanvas() {
 
   const ratio = Math.min(
     window.devicePixelRatio || 1,
-    compactMobile ? 1.25 : celebration.isMobile ? 1.5 : 2
+    compactMobile ? 1 : celebration.simpleMode ? 1.2 : celebration.isMobile ? 1.4 : 2
   );
   celebration.width = viewportWidth;
   celebration.height = viewportHeight;
@@ -513,8 +571,8 @@ function resizeCelebrationCanvas() {
 
 function buildHeartPoints() {
   const points = [];
-  const layerReach = celebration.isMobile ? 6 : 8;
-  const angleStep = celebration.isMobile ? 0.125 : 0.09;
+  const layerReach = celebration.simpleMode ? 3 : celebration.isMobile ? 5 : 8;
+  const angleStep = celebration.simpleMode ? 0.22 : celebration.isMobile ? 0.14 : 0.09;
 
   for (let layer = -layerReach; layer <= layerReach; layer += 1) {
     const depth = layer * 0.38;
@@ -544,7 +602,7 @@ function buildHeartPoints() {
 }
 
 function buildStars() {
-  const count = Math.round(240 * celebration.quality);
+  const count = Math.max(24, Math.round(150 * celebration.quality));
   celebration.stars = Array.from({ length: count }, () => ({
     x: (Math.random() - 0.5) * 24,
     y: (Math.random() - 0.5) * 16,
@@ -556,7 +614,9 @@ function buildStars() {
 }
 
 function buildSparks() {
-  const count = Math.round(170 * celebration.quality);
+  const count = celebration.simpleMode
+    ? Math.max(0, Math.round(42 * celebration.quality))
+    : Math.max(18, Math.round(110 * celebration.quality));
   celebration.sparks = Array.from({ length: count }, () => ({
     angle: Math.random() * Math.PI * 2,
     radius: Math.random() * 6 + 1.5,
@@ -570,7 +630,9 @@ function buildSparks() {
 
 function buildPetals() {
   const colors = ["248,124,164", "255,205,176", "255,231,204"];
-  const count = Math.round(56 * celebration.quality);
+  const count = celebration.simpleMode
+    ? Math.max(0, Math.round(12 * celebration.quality))
+    : Math.max(8, Math.round(30 * celebration.quality));
   celebration.petals = Array.from({ length: count }, () => ({
     baseAngle: Math.random() * Math.PI * 2,
     radius: Math.random() * 5.5 + 2.8,
@@ -585,7 +647,7 @@ function buildPetals() {
 }
 
 function buildRibbons() {
-  const count = celebration.isMobile ? 4 : 5;
+  const count = celebration.simpleMode ? 0 : celebration.isMobile ? 3 : 4;
   celebration.ribbons = Array.from({ length: count }, (_, index) => ({
     radius: 3.5 + index * 0.7,
     width: 0.22 + index * 0.03,
@@ -642,6 +704,14 @@ function projectPoint(point, cameraZ) {
 
 function drawGlow(x, y, size, color, alpha) {
   if (size <= 0) {
+    return;
+  }
+
+  if (celebration.simpleMode || size < 2.4) {
+    celebration.ctx.fillStyle = `rgba(${color}, ${alpha})`;
+    celebration.ctx.beginPath();
+    celebration.ctx.arc(x, y, Math.max(1, size), 0, Math.PI * 2);
+    celebration.ctx.fill();
     return;
   }
 
@@ -779,6 +849,10 @@ function drawPetal(x, y, size, rotation, tint, alpha) {
 }
 
 function drawPetalCloud(elapsed, cameraZ, sceneRotation) {
+  if (!celebration.petals.length) {
+    return;
+  }
+
   const petals = [];
 
   celebration.petals.forEach((petal) => {
@@ -873,20 +947,22 @@ function drawHeartField(elapsed, cameraZ, sceneRotation) {
     });
   });
 
-  celebration.ctx.beginPath();
-  for (let index = 1; index < projectedPoints.length; index += 1) {
-    const previous = projectedPoints[index - 1];
-    const current = projectedPoints[index];
-    if (previous.layer !== current.layer || index % 5 !== 0) {
-      continue;
-    }
+  if (!celebration.simpleMode) {
+    celebration.ctx.beginPath();
+    for (let index = 1; index < projectedPoints.length; index += 1) {
+      const previous = projectedPoints[index - 1];
+      const current = projectedPoints[index];
+      if (previous.layer !== current.layer || index % 5 !== 0) {
+        continue;
+      }
 
-    celebration.ctx.moveTo(previous.x, previous.y);
-    celebration.ctx.lineTo(current.x, current.y);
+      celebration.ctx.moveTo(previous.x, previous.y);
+      celebration.ctx.lineTo(current.x, current.y);
+    }
+    celebration.ctx.strokeStyle = "rgba(255, 217, 180, 0.08)";
+    celebration.ctx.lineWidth = celebration.isMobile ? 0.8 : 1.1;
+    celebration.ctx.stroke();
   }
-  celebration.ctx.strokeStyle = "rgba(255, 217, 180, 0.08)";
-  celebration.ctx.lineWidth = celebration.isMobile ? 0.8 : 1.1;
-  celebration.ctx.stroke();
 
   projectedPoints
     .sort((left, right) => left.depth - right.depth)
@@ -896,6 +972,10 @@ function drawHeartField(elapsed, cameraZ, sceneRotation) {
 }
 
 function drawSparkOrbit(elapsed, cameraZ, sceneRotation) {
+  if (!celebration.sparks.length) {
+    return;
+  }
+
   celebration.sparks.forEach((spark, index) => {
     const orbitAngle = spark.angle + elapsed * spark.speed;
     const bob = Math.sin(elapsed * 1.4 + spark.phase + index * 0.04) * 0.85;
@@ -948,10 +1028,14 @@ function renderCelebrationFrame(timestamp) {
   drawBackdropHalo(elapsed);
   ctx.globalCompositeOperation = "screen";
   drawStarField(elapsed, cameraZ);
-  drawRibbon(elapsed, cameraZ, sceneRotation);
-  drawPetalCloud(elapsed, cameraZ, sceneRotation);
+  if (!celebration.simpleMode) {
+    drawRibbon(elapsed, cameraZ, sceneRotation);
+    drawPetalCloud(elapsed, cameraZ, sceneRotation);
+  }
   drawHeartField(elapsed, cameraZ, sceneRotation);
-  drawSparkOrbit(elapsed, cameraZ, sceneRotation);
+  if (!celebration.simpleMode) {
+    drawSparkOrbit(elapsed, cameraZ, sceneRotation);
+  }
   ctx.globalCompositeOperation = "source-over";
   celebration.rafId = window.requestAnimationFrame(renderCelebrationFrame);
 }
@@ -993,6 +1077,23 @@ function resetSceneTilt() {
   celebrationScene.style.setProperty("--scene-tilt-y", "0deg");
 }
 
+function scheduleSceneTilt(clientX, clientY) {
+  pendingTiltPoint = { clientX, clientY };
+  if (tiltRafId) {
+    return;
+  }
+
+  tiltRafId = window.requestAnimationFrame(() => {
+    tiltRafId = 0;
+    if (!pendingTiltPoint) {
+      return;
+    }
+
+    updateSceneTilt(pendingTiltPoint.clientX, pendingTiltPoint.clientY);
+    pendingTiltPoint = null;
+  });
+}
+
 function showOverlay() {
   stopCelebration();
   completionOverlay.classList.add("is-active");
@@ -1030,10 +1131,11 @@ boardElement.addEventListener("pointerleave", (event) => {
 
 window.addEventListener("pointerup", stopDragging);
 window.addEventListener("pointermove", (event) => {
-  updateGlobalParallax(event.clientX, event.clientY);
+  scheduleGlobalParallax(event.clientX, event.clientY);
 });
 window.addEventListener("pointerleave", resetGlobalParallax);
 window.addEventListener("resize", () => {
+  applyPerformanceMode();
   if (celebration.running) {
     initCelebrationScene();
   }
@@ -1042,7 +1144,7 @@ window.addEventListener("resize", () => {
 });
 
 celebrationScene.addEventListener("pointermove", (event) => {
-  updateSceneTilt(event.clientX, event.clientY);
+  scheduleSceneTilt(event.clientX, event.clientY);
 });
 celebrationScene.addEventListener("pointerleave", resetSceneTilt);
 celebrationScene.addEventListener("pointerup", resetSceneTilt);
